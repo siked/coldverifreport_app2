@@ -1,0 +1,82 @@
+{
+	"pages": [
+		// 冷链验证APP核心页面
+		{
+			"path": "pages/login/login",
+			"style": {
+				"navigationBarTitleText": "登录",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/task/category/category",
+			"style": {
+				"navigationBarTitleText": "任务管理",
+				"enablePullDownRefresh": true
+			}
+		},
+		{
+			"path": "pages/task/category-detail/category-detail",
+			"style": {
+				"navigationBarTitleText": "任务列表",
+				"enablePullDownRefresh": true
+			}
+		},
+		{
+			"path": "pages/profile/profile",
+			"style": {
+				"navigationBarTitleText": "个人信息"
+			}
+		},
+		{
+			"path": "pages/task/task-detail/task-detail",
+			"style": {
+				"navigationBarTitleText": "任务详情"
+			}
+		},
+		{
+			"path": "pages/task/realtime-data/realtime-data",
+			"style": {
+				"navigationBarTitleText": "实时曲线",
+				"enablePullDownRefresh": true
+			}
+		}
+	],
+	"globalStyle": {
+		"pageOrientation": "portrait",
+		"navigationBarTitleText": "冷链验证系统",
+		"navigationBarTextStyle": "white",
+		"navigationBarBackgroundColor": "#667eea",
+		"backgroundColor": "#F8F8F8",
+		"backgroundColorTop": "#F4F5F6",
+		"backgroundColorBottom": "#F4F5F6",
+		"mp-360": {
+			"navigationStyle": "custom"
+		},
+		"h5": {
+			"maxWidth": 1190,
+			"navigationBarTextStyle": "black",
+			"navigationBarBackgroundColor": "#F1F1F1"
+		}
+	},
+	"tabBar": {
+		"color": "#7A7E83",
+		"selectedColor": "#667eea",
+		"borderStyle": "black",
+		"backgroundColor": "#ffffff",
+		"list": [
+			{
+				"pagePath": "pages/task/category/category",
+				"iconPath": "static/task.png",
+				"selectedIconPath": "static/task-selected.png",
+				"text": "任务管理"
+			},
+			{
+				"pagePath": "pages/profile/profile",
+				"iconPath": "static/profile.png",
+				"selectedIconPath": "static/profile-selected.png",
+				"text": "个人信息"
+			}
+		]
+	}
+}
