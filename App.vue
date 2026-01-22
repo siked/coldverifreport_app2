@@ -8,6 +8,7 @@
 	// #ifdef APP
 	import checkUpdate from '@/uni_modules/uni-upgrade-center-app/utils/check-update';
 	// #endif
+	import { checkAppVersion } from '@/common/version-check.js'
 
 	export default {
 		onLaunch: function() {
@@ -24,6 +25,14 @@
 			
 			// 检查登录状态
 			this.checkLoginStatus();
+			
+			// 检查应用版本更新（延迟执行，避免阻塞启动）
+			setTimeout(() => {
+				checkAppVersion(true).catch(err => {
+					console.error('版本检查失败:', err);
+				});
+			}, 1000);
+			
 			// #ifdef APP-PLUS
 			// App平台检测升级，服务端代码是通过uniCloud的云函数实现的，详情可参考：https://ext.dcloud.net.cn/plugin?id=4542
 			if (plus.runtime.appid !== 'HBuilder') { // 真机运行不需要检查更新，真机运行时appid固定为'HBuilder'，这是调试基座的appid

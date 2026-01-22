@@ -242,7 +242,7 @@
             <text class="btn-icon">📈</text>
             <text class="btn-text">曲线图</text>
           </button>
-          <button class="add-device-btn-inline" @click="addDevice">
+          <button class="add-device-btn-inline" @click="showAddDeviceMenu">
             <text class="btn-icon">+</text>
             <text class="btn-text">添加设备</text>
           </button>
@@ -349,6 +349,63 @@
     </view>
   </view>
 
+  <!-- 添加设备菜单弹窗 -->
+  <view v-if="showAddDeviceMenuModal" class="modal-overlay" @click="hideAddDeviceMenu">
+    <view class="modal-content" @click.stop>
+      <view class="modal-header">
+        <text class="modal-title">添加设备</text>
+        <text class="modal-close" @click="hideAddDeviceMenu">×</text>
+      </view>
+      <view class="modal-body">
+        <view class="menu-option" @click="handleScanAdd">
+          <text class="menu-icon">📷</text>
+          <text class="menu-text">扫码添加</text>
+        </view>
+        <view class="menu-option" @click="handleDirectAddDevice">
+          <text class="menu-icon">➕</text>
+          <text class="menu-text">添加设备</text>
+        </view>
+        <view class="menu-option" @click="handleAddGateway">
+          <text class="menu-icon">🌐</text>
+          <text class="menu-text">添加网关</text>
+        </view>
+      </view>
+      <view class="modal-footer">
+        <button class="modal-cancel-btn" @click="hideAddDeviceMenu">取消</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 添加网关弹窗 -->
+  <view v-if="showAddGatewayModal" class="modal-overlay" @click="hideAddGatewayModal">
+    <view class="modal-content gateway-modal-content" @click.stop>
+      <view class="modal-header">
+        <text class="modal-title">添加网关</text>
+        <text class="modal-close" @click="hideAddGatewayModal">×</text>
+      </view>
+      <view class="modal-body">
+        <view class="gateway-input-wrapper">
+          <text class="gateway-label">网关SN</text>
+          <input 
+            v-model="gatewaySnInput"
+            class="gateway-input"
+            placeholder="请输入网关SN，例如：W00001"
+            maxlength="20"
+            @input="onGatewaySnInput"
+          />
+          <view class="gateway-hint">
+            <text class="hint-icon">💡</text>
+            <text class="hint-text">网关SN必须以字母 W 开头</text>
+          </view>
+        </view>
+      </view>
+      <view class="modal-footer">
+        <button class="modal-cancel-btn" @click="hideAddGatewayModal">取消</button>
+        <button class="modal-confirm-btn" @click="confirmAddGateway" :disabled="!isGatewaySnValid">确定</button>
+      </view>
+    </view>
+  </view>
+
   <!-- 时间滚轮选择弹窗 -->
   <view v-if="showTimeWheel" class="modal-overlay" @click="closeTimeWheel">
     <view class="modal-content" @click.stop>
@@ -394,6 +451,8 @@
 
 <script>
 import apiService from "@/common/api.js"
+import storageManager from "@/common/storage.js"
+import permision from "@/common/permission.js"
 
 export default {
   // H5 下路由可能会把 query/params 作为 attrs 传进来，这里关闭自动透传以避免 warning
@@ -442,7 +501,12 @@ export default {
       timeWheelHours: [],
       timeWheelMinutes: [],
       timeWheelValue: [0, 0],
-      timeWheelIndicatorStyle: 'height: 50px;'
+      timeWheelIndicatorStyle: 'height: 50px;',
+      // 添加设备菜单弹窗
+      showAddDeviceMenuModal: false,
+      // 添加网关弹窗
+      showAddGatewayModal: false,
+      gatewaySnInput: ''
     }
   },
   computed: {
@@ -512,6 +576,11 @@ export default {
         return false;
       }
       return !(this.hasTagChanges || this.hasDeviceChanges);
+    },
+    // 检查网关SN是否有效
+    isGatewaySnValid() {
+      const sn = this.gatewaySnInput.trim();
+      return sn.length > 0 && sn.toUpperCase().startsWith('W');
     }
   },
 
@@ -2301,6 +2370,254 @@ export default {
     
     goBack() {
       uni.navigateBack();
+    },
+    
+    // 显示添加设备菜单
+    showAddDeviceMenu() {
+      this.showAddDeviceMenuModal = true;
+    },
+    
+    // 隐藏添加设备菜单
+    hideAddDeviceMenu() {
+      this.showAddDeviceMenuModal = false;
+    },
+    
+    // 处理扫码添加
+    async handleScanAdd() {
+      this.hideAddDeviceMenu();
+      
+      // #ifdef APP-PLUS
+      let status = await this.checkCameraPermission();
+      if (status !== 1) {
+        return;
+      }
+      // #endif
+      
+      uni.scanCode({
+        success: (res) => {
+          const scanResult = res.result || '';
+          console.log('扫码结果:', scanResult);
+          
+          if (!scanResult) {
+            uni.showToast({
+              title: '扫码结果为空',
+              icon: 'none'
+            });
+            return;
+          }
+          
+          // 判断是否是W开头的（网关）
+          if (scanResult.trim().toUpperCase().startsWith('W')) {
+            // 是网关，从缓存中查找对应的设备列表
+            this.addDevicesFromGateway(scanResult.trim());
+          } else {
+            // 不是网关，直接添加设备
+            this.addSingleDevice(scanResult.trim());
+          }
+        },
+        fail: (err) => {
+          console.error('扫码失败:', err);
+          if (err && err.errMsg && err.errMsg.indexOf('cancel') === -1) {
+            uni.showToast({
+              title: '扫码失败',
+              icon: 'none'
+            });
+          }
+        }
+      });
+    },
+    
+    // 处理直接添加设备
+    handleDirectAddDevice() {
+      this.hideAddDeviceMenu();
+      this.addDevice();
+    },
+    
+    // 处理添加网关
+    handleAddGateway() {
+      this.hideAddDeviceMenu();
+      this.gatewaySnInput = '';
+      this.showAddGatewayModal = true;
+    },
+    
+    // 隐藏添加网关弹窗
+    hideAddGatewayModal() {
+      this.showAddGatewayModal = false;
+      this.gatewaySnInput = '';
+    },
+    
+    // 网关SN输入处理
+    onGatewaySnInput(e) {
+      this.gatewaySnInput = e.detail ? e.detail.value : (e.target ? e.target.value : '');
+    },
+    
+    // 确认添加网关
+    confirmAddGateway() {
+      const gatewaySn = this.gatewaySnInput.trim();
+      
+      if (!gatewaySn) {
+        uni.showToast({
+          title: '请输入网关SN',
+          icon: 'none'
+        });
+        return;
+      }
+      
+      // 验证是否以W开头
+      if (!gatewaySn.toUpperCase().startsWith('W')) {
+        uni.showToast({
+          title: '网关SN必须以W开头',
+          icon: 'none'
+        });
+        return;
+      }
+      
+      // 关闭弹窗
+      this.hideAddGatewayModal();
+      
+      // 从缓存中查找对应的设备列表并添加
+      this.addDevicesFromGateway(gatewaySn);
+    },
+    
+    // 从网关添加设备
+    addDevicesFromGateway(gatewaySn) {
+      try {
+        // 从缓存中获取网关设备列表
+        const gatewayDeviceSnList = storageManager.getGatewayDeviceSnList() || [];
+        
+        // 查找匹配的网关
+        const gateway = gatewayDeviceSnList.find(g => 
+          g.gatewaySn && g.gatewaySn.toUpperCase() === gatewaySn.toUpperCase()
+        );
+        
+        if (!gateway) {
+          uni.showToast({
+            title: `未找到网关 ${gatewaySn} 的设备列表`,
+            icon: 'none',
+            duration: 2000
+          });
+          return;
+        }
+        
+        const deviceSnList = gateway.deviceSnList || [];
+        if (deviceSnList.length === 0) {
+          uni.showToast({
+            title: `网关 ${gatewaySn} 下没有设备`,
+            icon: 'none'
+          });
+          return;
+        }
+        
+        // 获取当前已有的设备SN列表，用于去重
+        const existingDeviceSns = (this.deviceSnList || [])
+          .map(d => d.deviceSn)
+          .filter(sn => sn && sn.trim() !== '');
+        
+        // 添加设备，去重
+        let addedCount = 0;
+        deviceSnList.forEach(deviceSn => {
+          if (deviceSn && deviceSn.trim() !== '') {
+            // 检查是否已存在
+            if (!existingDeviceSns.includes(deviceSn.trim())) {
+              const nextDeviceId = this.generateNextDeviceId();
+              const newItem = {
+                __key: `dev_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+                deviceId: nextDeviceId,
+                deviceSn: deviceSn.trim()
+              };
+              this.deviceSnList = [...(this.deviceSnList || []), newItem];
+              existingDeviceSns.push(deviceSn.trim());
+              addedCount++;
+            }
+          }
+        });
+        
+        if (addedCount > 0) {
+          this.updateCacheData();
+          uni.showToast({
+            title: `成功添加 ${addedCount} 个设备`,
+            icon: 'success'
+          });
+        } else {
+          uni.showToast({
+            title: '所有设备已存在',
+            icon: 'none'
+          });
+        }
+      } catch (error) {
+        console.error('从网关添加设备失败:', error);
+        uni.showToast({
+          title: '添加设备失败: ' + (error.message || '未知错误'),
+          icon: 'none'
+        });
+      }
+    },
+    
+    // 添加单个设备
+    addSingleDevice(deviceSn) {
+      if (!deviceSn || deviceSn.trim() === '') {
+        uni.showToast({
+          title: '设备SN不能为空',
+          icon: 'none'
+        });
+        return;
+      }
+      
+      // 检查是否已存在
+      const existingDeviceSns = (this.deviceSnList || [])
+        .map(d => d.deviceSn)
+        .filter(sn => sn && sn.trim() !== '');
+      
+      if (existingDeviceSns.includes(deviceSn.trim())) {
+        uni.showToast({
+          title: '设备已存在',
+          icon: 'none'
+        });
+        return;
+      }
+      
+      // 添加设备
+      const nextDeviceId = this.generateNextDeviceId();
+      const newItem = {
+        __key: `dev_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+        deviceId: nextDeviceId,
+        deviceSn: deviceSn.trim()
+      };
+      this.deviceSnList = [...(this.deviceSnList || []), newItem];
+      this.updateCacheData();
+      
+      uni.showToast({
+        title: '添加成功',
+        icon: 'success'
+      });
+    },
+    
+    // 检查相机权限（APP端）
+    async checkCameraPermission() {
+      // #ifdef APP-PLUS
+      let status = permision.isIOS 
+        ? await permision.requestIOS('camera')
+        : await permision.requestAndroid('android.permission.CAMERA');
+      
+      if (status === null || status === 1) {
+        return 1;
+      } else {
+        uni.showModal({
+          content: "需要相机权限才能扫码",
+          confirmText: "设置",
+          success: function(res) {
+            if (res.confirm) {
+              permision.gotoAppSetting();
+            }
+          }
+        });
+        return 0;
+      }
+      // #endif
+      
+      // #ifndef APP-PLUS
+      return 1;
+      // #endif
     }
   }
 }
@@ -3240,7 +3557,103 @@ export default {
   box-shadow: 0 2rpx 6rpx rgba(102, 126, 234, 0.2);
 }
 
+/* 菜单选项样式 */
+.menu-option {
+  display: flex;
+  align-items: center;
+  padding: 30rpx 20rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+  transition: all 0.2s ease;
+}
 
+.menu-option:last-child {
+  border-bottom: none;
+}
+
+.menu-option:active {
+  background-color: #f5f5f5;
+}
+
+.menu-icon {
+  font-size: 40rpx;
+  margin-right: 20rpx;
+}
+
+.menu-text {
+  font-size: 30rpx;
+  color: #333;
+  font-weight: 500;
+}
+
+/* 添加网关弹窗样式 */
+.gateway-modal-content {
+  max-width: 650rpx;
+}
+
+.gateway-input-wrapper {
+  padding: 20rpx 0;
+}
+
+.gateway-label {
+  display: block;
+  font-size: 28rpx;
+  color: #374151;
+  font-weight: 600;
+  margin-bottom: 16rpx;
+}
+
+.gateway-input {
+  width: 100%;
+  height: 88rpx;
+  border: 2rpx solid #e5e7eb;
+  border-radius: 12rpx;
+  padding: 0 24rpx;
+  font-size: 30rpx;
+  color: #1f2937;
+  background: #ffffff;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+  margin-bottom: 16rpx;
+}
+
+.gateway-input:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 4rpx rgba(102, 126, 234, 0.1);
+  outline: none;
+  background: #fafbff;
+}
+
+.gateway-input::placeholder {
+  color: #9ca3af;
+  font-size: 28rpx;
+}
+
+.gateway-hint {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 12rpx 16rpx;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 1rpx solid #fcd34d;
+  border-radius: 8rpx;
+  margin-top: 8rpx;
+}
+
+.hint-icon {
+  font-size: 28rpx;
+}
+
+.hint-text {
+  font-size: 24rpx;
+  color: #92400e;
+  line-height: 1.5;
+}
+
+.modal-confirm-btn[disabled] {
+  opacity: 0.5;
+  filter: grayscale(0.3);
+  cursor: not-allowed;
+}
 
 .no-tags {
   text-align: center;

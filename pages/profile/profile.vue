@@ -44,6 +44,20 @@
         <text class="menu-arrow">▶</text>
       </view>
       
+      <view class="menu-item" @click="checkVersionUpdate">
+        <view class="menu-left">
+          <text class="menu-icon">🔄</text>
+          <text class="menu-text">版本更新</text>
+          <view class="update-badge" v-if="hasNewVersion">
+            <text class="update-badge-text">新</text>
+          </view>
+        </view>
+        <view class="menu-right">
+          <text class="version-text-small">{{ currentVersion }}</text>
+          <text class="menu-arrow">▶</text>
+        </view>
+      </view>
+      
       <view class="menu-item" @click="aboutApp">
         <view class="menu-left">
           <text class="menu-icon">ℹ️</text>
@@ -68,13 +82,17 @@
 <script>
 import storageManager from '@/common/storage.js'
 import apiService from '@/common/api.js'
+import { checkAppVersion, getAppVersion } from '@/common/version-check.js'
 
 export default {
   data() {
     return {
       userInfo: {},
       serverUrl: '',
-      hasUnsyncedData: false
+      hasUnsyncedData: false,
+      currentVersion: 'v1.0.0',
+      hasNewVersion: false,
+      latestVersionInfo: null
     }
   },
 
@@ -91,11 +109,14 @@ export default {
   onLoad() {
     this.loadUserData();
     this.checkUnsyncedData();
+    this.initVersionInfo();
   },
 
   onShow() {
     // 从其他页面返回时检查未同步数据
     this.checkUnsyncedData();
+    // 检查版本更新
+    this.checkVersionStatus();
   },
 
   methods: {
@@ -142,11 +163,61 @@ export default {
       });
     },
 
+    // 初始化版本信息
+    initVersionInfo() {
+      this.currentVersion = getAppVersion();
+    },
+
+    // 检查版本状态
+    async checkVersionStatus() {
+      try {
+        const versionInfo = await checkAppVersion(false); // 不自动显示对话框
+        if (versionInfo) {
+          this.hasNewVersion = true;
+          this.latestVersionInfo = versionInfo;
+        } else {
+          this.hasNewVersion = false;
+          this.latestVersionInfo = null;
+        }
+      } catch (error) {
+        console.error('检查版本状态失败:', error);
+        this.hasNewVersion = false;
+      }
+    },
+
+    // 检查版本更新（手动检查，忽略跳过状态）
+    async checkVersionUpdate() {
+      try {
+        uni.showLoading({ title: '检查更新中...' });
+        // 手动检查时，忽略跳过状态，强制显示升级弹窗
+        const versionInfo = await checkAppVersion(true, true); // 显示更新对话框，忽略跳过状态
+        uni.hideLoading();
+        
+        if (!versionInfo) {
+          uni.showToast({
+            title: '已是最新版本',
+            icon: 'success'
+          });
+          this.hasNewVersion = false;
+        } else {
+          this.hasNewVersion = true;
+          this.latestVersionInfo = versionInfo;
+        }
+      } catch (error) {
+        uni.hideLoading();
+        console.error('检查版本更新失败:', error);
+        uni.showToast({
+          title: '检查更新失败',
+          icon: 'none'
+        });
+      }
+    },
+
     // 关于应用
     aboutApp() {
       uni.showModal({
         title: '关于冷链验证系统',
-        content: '版本: 1.0.0\n这是一个专业的冷链验证实施过程记录应用，帮助用户高效管理冷链验证任务。',
+        content: `版本: ${this.currentVersion}\n这是一个专业的冷链验证实施过程记录应用，帮助用户高效管理冷链验证任务。`,
         showCancel: false
       });
     },
@@ -395,5 +466,34 @@ export default {
   font-size: 20rpx;
   color: white;
   font-weight: 500;
+}
+
+.update-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40rpx;
+  height: 28rpx;
+  padding: 0 10rpx;
+  background: #ff4757;
+  border-radius: 14rpx;
+  margin-left: 12rpx;
+}
+
+.update-badge-text {
+  font-size: 18rpx;
+  color: white;
+  font-weight: 500;
+}
+
+.menu-right {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.version-text-small {
+  font-size: 24rpx;
+  color: #999;
 }
 </style>

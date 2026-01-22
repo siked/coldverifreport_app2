@@ -14,7 +14,8 @@ class StorageManager {
       USER_INFO: 'user_info',
       SERVER_HISTORY: 'server_history',
       GATEWAY_DEVICE_SN_LIST: 'gateway_device_sn_list',
-      HAS_UNSYNCED_DATA: 'has_unsynced_data'
+      HAS_UNSYNCED_DATA: 'has_unsynced_data',
+      SKIPPED_VERSIONS: 'skipped_versions'
     };
   }
 
@@ -451,6 +452,87 @@ class StorageManager {
     return serverUrl;
   }
 
+  /**
+   * 标准化版本号格式（统一处理大小写和v前缀）
+   * @param {string} versionName - 版本号
+   * @returns {string} 标准化后的版本号
+   */
+  normalizeVersion(versionName) {
+    if (!versionName) return '';
+    // 统一转为小写，确保v前缀一致
+    return versionName.toLowerCase().trim();
+  }
+
+  /**
+   * 设置跳过的版本号
+   * @param {string} versionName - 版本号
+   */
+  setSkippedVersion(versionName) {
+    try {
+      if (!versionName) {
+        console.error('版本号不能为空');
+        return false;
+      }
+      const normalizedVersion = this.normalizeVersion(versionName);
+      let skippedVersions = this.getSkippedVersions();
+      if (!skippedVersions.includes(normalizedVersion)) {
+        skippedVersions.push(normalizedVersion);
+        uni.setStorageSync(this.KEYS.SKIPPED_VERSIONS, skippedVersions);
+        console.log('已保存跳过版本:', normalizedVersion);
+      } else {
+        console.log('版本已存在于跳过列表:', normalizedVersion);
+      }
+      return true;
+    } catch (error) {
+      console.error('设置跳过版本失败:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 获取所有跳过的版本号列表
+   * @returns {Array<string>} 跳过的版本号列表
+   */
+  getSkippedVersions() {
+    try {
+      return uni.getStorageSync(this.KEYS.SKIPPED_VERSIONS) || [];
+    } catch (error) {
+      console.error('获取跳过版本列表失败:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 检查版本是否被跳过
+   * @param {string} versionName - 版本号
+   * @returns {boolean} 是否被跳过
+   */
+  isVersionSkipped(versionName) {
+    if (!versionName) return false;
+    const normalizedVersion = this.normalizeVersion(versionName);
+    const skippedVersions = this.getSkippedVersions();
+    const result = skippedVersions.includes(normalizedVersion);
+    console.log('检查版本跳过状态:', {
+      original: versionName,
+      normalized: normalizedVersion,
+      skippedList: skippedVersions,
+      result: result
+    });
+    return result;
+  }
+
+  /**
+   * 清除所有跳过的版本记录
+   */
+  clearSkippedVersions() {
+    try {
+      uni.removeStorageSync(this.KEYS.SKIPPED_VERSIONS);
+      return true;
+    } catch (error) {
+      console.error('清除跳过版本记录失败:', error);
+      return false;
+    }
+  }
 
 }
 

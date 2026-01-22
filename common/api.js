@@ -431,6 +431,19 @@ class ApiService {
       throw error;
     }
   }
+
+  /**
+   * 获取最新版本（公开接口，不需要认证）
+   * @returns {Promise} Promise对象，返回最新版本信息
+   */
+  async getLatestVersion() {
+    try {
+      const data = await this.get('/api/app-versions/latest', {}, { auth: false });
+      return data;
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 // 创建单例实例

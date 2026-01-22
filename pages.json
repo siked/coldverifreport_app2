@@ -52,6 +52,13 @@
 			"style": {
 				"navigationBarTitleText": "设备列表"
 			}
+		},
+		{
+			"path": "pages/upgrade/index",
+			"style": {
+				"navigationBarTitleText": "版本更新",
+				"navigationStyle": "custom"
+			}
 		}
 	],
 	"globalStyle": {
