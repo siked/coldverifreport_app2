@@ -25,6 +25,17 @@
 
     <!-- 功能菜单 -->
     <view class="menu-section">
+      <view class="menu-item" @click="goToGatewayManagement">
+        <view class="menu-left">
+          <text class="menu-icon">📡</text>
+          <text class="menu-text">网关设备管理</text>
+          <view class="unsynced-badge" v-if="hasUnsyncedData">
+            <text class="unsynced-badge-text">未上传</text>
+          </view>
+        </view>
+        <text class="menu-arrow">▶</text>
+      </view>
+      
       <view class="menu-item" @click="clearCache">
         <view class="menu-left">
           <text class="menu-icon">🗑️</text>
@@ -56,12 +67,14 @@
 
 <script>
 import storageManager from '@/common/storage.js'
+import apiService from '@/common/api.js'
 
 export default {
   data() {
     return {
       userInfo: {},
-      serverUrl: ''
+      serverUrl: '',
+      hasUnsyncedData: false
     }
   },
 
@@ -77,6 +90,12 @@ export default {
 
   onLoad() {
     this.loadUserData();
+    this.checkUnsyncedData();
+  },
+
+  onShow() {
+    // 从其他页面返回时检查未同步数据
+    this.checkUnsyncedData();
   },
 
   methods: {
@@ -84,6 +103,18 @@ export default {
     loadUserData() {
       this.userInfo = storageManager.getUserInfo() || {};
       this.serverUrl = storageManager.getServerUrl() || '未设置';
+    },
+
+    // 检查是否有未同步的数据
+    checkUnsyncedData() {
+      this.hasUnsyncedData = storageManager.getHasUnsyncedData();
+    },
+
+    // 跳转到网关设备管理
+    goToGatewayManagement() {
+      uni.navigateTo({
+        url: '/pages/gateway/gateway-list'
+      });
     },
 
     // 清除缓存
@@ -121,7 +152,47 @@ export default {
     },
 
     // 退出登录
-    logout() {
+    async logout() {
+      // 检查是否有未上传的数据
+      const hasUnsynced = storageManager.getHasUnsyncedData();
+      const cachedList = storageManager.getGatewayDeviceSnList();
+      
+      if (hasUnsynced && cachedList && cachedList.length > 0) {
+        // 尝试上传缓存的数据
+        try {
+          uni.showLoading({ title: '正在上传数据...' });
+          await apiService.updateGatewayDevices(cachedList, true);
+          uni.hideLoading();
+          
+          // 上传成功，清除标记
+          storageManager.setHasUnsyncedData(false);
+          
+          // 清除认证数据并退出
+          this.doLogout();
+        } catch (error) {
+          uni.hideLoading();
+          
+          // 上传失败，询问是否强制退出
+          uni.showModal({
+            title: '数据未上传',
+            content: '仍有未上传的数据，退出后将被清除。是否强制退出？',
+            success: (res) => {
+              if (res.confirm) {
+                // 强制退出，清除所有数据
+                storageManager.clearAuthData();
+                this.showLogoutSuccess();
+              }
+            }
+          });
+        }
+      } else {
+        // 没有未上传数据，直接退出
+        this.doLogout();
+      }
+    },
+
+    // 执行退出登录
+    doLogout() {
       uni.showModal({
         title: '确认退出',
         content: '确定要退出登录吗？',
@@ -129,21 +200,25 @@ export default {
           if (res.confirm) {
             // 清除认证数据
             storageManager.clearAuthData();
-            
-            uni.showToast({
-              title: '已退出登录',
-              icon: 'success'
-            });
-            
-            // 延迟跳转到登录页面
-            setTimeout(() => {
-              uni.redirectTo({
-                url: '/pages/login/login'
-              });
-            }, 1000);
+            this.showLogoutSuccess();
           }
         }
       });
+    },
+
+    // 显示退出成功提示并跳转
+    showLogoutSuccess() {
+      uni.showToast({
+        title: '已退出登录',
+        icon: 'success'
+      });
+      
+      // 延迟跳转到登录页面
+      setTimeout(() => {
+        uni.redirectTo({
+          url: '/pages/login/login'
+        });
+      }, 1000);
     }
   }
 }
@@ -302,5 +377,23 @@ export default {
 .version-text {
   font-size: 24rpx;
   color: #999;
+}
+
+.unsynced-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 60rpx;
+  height: 32rpx;
+  padding: 0 12rpx;
+  background: #ff4757;
+  border-radius: 16rpx;
+  margin-left: 12rpx;
+}
+
+.unsynced-badge-text {
+  font-size: 20rpx;
+  color: white;
+  font-weight: 500;
 }
 </style>

@@ -160,6 +160,12 @@ class ApiService {
         // 保存token和用户信息
         storageManager.setToken(data.token);
         storageManager.setUserInfo(data.user);
+        // 保存网关设备列表到缓存
+        if (data.user && data.user.gatewayDeviceSnList) {
+          storageManager.setGatewayDeviceSnList(data.user.gatewayDeviceSnList);
+        } else {
+          storageManager.setGatewayDeviceSnList([]);
+        }
         return data;
       } else {
         throw new Error('登录失败');
@@ -341,6 +347,87 @@ class ApiService {
       return true;
     } catch (error) {
       this.baseURL = originalBaseURL;
+      throw error;
+    }
+  }
+
+  /**
+   * 获取网关设备列表
+   * @returns {Promise} Promise对象，返回 gatewayDeviceSnList
+   */
+  async getGatewayDevices() {
+    try {
+      const data = await this.get('/api/user-enf/gateway-devices');
+      return data.gatewayDeviceSnList || [];
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * 检查网络状态
+   * @returns {Promise<boolean>} 是否有网络连接
+   */
+  async checkNetworkStatus() {
+    return new Promise((resolve) => {
+      uni.getNetworkType({
+        success: (res) => {
+          // networkType: wifi/2g/3g/4g/5g/ethernet/unknown/none
+          resolve(res.networkType !== 'none' && res.networkType !== 'unknown');
+        },
+        fail: () => {
+          resolve(false);
+        }
+      });
+    });
+  }
+
+  /**
+   * 更新网关设备列表
+   * @param {Array} gatewayDeviceSnList - 网关设备列表
+   * @param {boolean} forceOnline - 是否强制在线模式（默认false，允许离线保存）
+   * @returns {Promise} Promise对象
+   */
+  async updateGatewayDevices(gatewayDeviceSnList, forceOnline = false) {
+    try {
+      if (!Array.isArray(gatewayDeviceSnList)) {
+        throw new Error('网关设备列表必须是数组格式');
+      }
+      
+      // 先保存到本地缓存
+      storageManager.setGatewayDeviceSnList(gatewayDeviceSnList);
+      
+      // 检查网络状态
+      const hasNetwork = await this.checkNetworkStatus();
+      
+      if (!hasNetwork) {
+        // 没有网络，只保存到本地并标记为未同步
+        if (forceOnline) {
+          throw new Error('网络连接失败，请检查网络设置');
+        }
+        storageManager.setHasUnsyncedData(true);
+        // 返回一个特殊标记，表示已保存到本地但未上传
+        return { success: true, cached: true, message: '已保存到本地，等待网络恢复后上传' };
+      }
+      
+      // 有网络，尝试上传
+      try {
+        const data = await this.put('/api/user-enf/gateway-devices', {
+          gatewayDeviceSnList
+        });
+        // 上传成功，清除未同步标记
+        storageManager.setHasUnsyncedData(false);
+        return data;
+      } catch (error) {
+        // 上传失败，但已保存到本地，标记为未同步
+        storageManager.setHasUnsyncedData(true);
+        if (forceOnline) {
+          throw error;
+        }
+        // 离线模式：返回成功但标记为已缓存
+        return { success: true, cached: true, message: '已保存到本地，上传失败: ' + error.message };
+      }
+    } catch (error) {
       throw error;
     }
   }

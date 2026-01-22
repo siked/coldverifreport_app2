@@ -40,6 +40,18 @@
 				"navigationBarTitleText": "实时曲线",
 				"enablePullDownRefresh": true
 			}
+		},
+		{
+			"path": "pages/gateway/gateway-list",
+			"style": {
+				"navigationBarTitleText": "网关设备管理"
+			}
+		},
+		{
+			"path": "pages/gateway/device-list",
+			"style": {
+				"navigationBarTitleText": "设备列表"
+			}
 		}
 	],
 	"globalStyle": {

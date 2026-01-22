@@ -12,7 +12,9 @@ class StorageManager {
       PASSWORD: 'password',
       TOKEN: 'token',
       USER_INFO: 'user_info',
-      SERVER_HISTORY: 'server_history'
+      SERVER_HISTORY: 'server_history',
+      GATEWAY_DEVICE_SN_LIST: 'gateway_device_sn_list',
+      HAS_UNSYNCED_DATA: 'has_unsynced_data'
     };
   }
 
@@ -341,12 +343,68 @@ class StorageManager {
   }
 
   /**
+   * 设置网关设备列表
+   * @param {Array} gatewayDeviceSnList - 网关设备列表
+   */
+  setGatewayDeviceSnList(gatewayDeviceSnList) {
+    try {
+      uni.setStorageSync(this.KEYS.GATEWAY_DEVICE_SN_LIST, gatewayDeviceSnList || []);
+      return true;
+    } catch (error) {
+      console.error('设置网关设备列表失败:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 获取网关设备列表
+   * @returns {Array} 网关设备列表
+   */
+  getGatewayDeviceSnList() {
+    try {
+      return uni.getStorageSync(this.KEYS.GATEWAY_DEVICE_SN_LIST) || [];
+    } catch (error) {
+      console.error('获取网关设备列表失败:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 设置是否有未同步的数据
+   * @param {boolean} hasUnsynced - 是否有未同步的数据
+   */
+  setHasUnsyncedData(hasUnsynced) {
+    try {
+      uni.setStorageSync(this.KEYS.HAS_UNSYNCED_DATA, hasUnsynced);
+      return true;
+    } catch (error) {
+      console.error('设置未同步数据标记失败:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 获取是否有未同步的数据
+   * @returns {boolean} 是否有未同步的数据
+   */
+  getHasUnsyncedData() {
+    try {
+      return uni.getStorageSync(this.KEYS.HAS_UNSYNCED_DATA) || false;
+    } catch (error) {
+      console.error('获取未同步数据标记失败:', error);
+      return false;
+    }
+  }
+
+  /**
    * 清除所有认证相关数据（退出登录时使用）
    */
   clearAuthData() {
     try {
       uni.removeStorageSync(this.KEYS.TOKEN);
       uni.removeStorageSync(this.KEYS.USER_INFO);
+      uni.removeStorageSync(this.KEYS.GATEWAY_DEVICE_SN_LIST);
+      uni.removeStorageSync(this.KEYS.HAS_UNSYNCED_DATA);
       return true;
     } catch (error) {
       console.error('清除认证数据失败:', error);
