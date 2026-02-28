@@ -23,6 +23,12 @@
 			}
 		},
 		{
+			"path": "pages/task/global-variables/global-variables",
+			"style": {
+				"navigationBarTitleText": "全局变量"
+			}
+		},
+		{
 			"path": "pages/profile/profile",
 			"style": {
 				"navigationBarTitleText": "个人信息"

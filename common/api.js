@@ -192,7 +192,7 @@ class ApiService {
    * 获取任务列表
    * @param {string} categoryId - 分类ID
    * @param {boolean} forceRefresh - 是否强制刷新
-   * @returns {Promise} Promise对象
+   * @returns {Promise} Promise对象，返回包含任务列表和全局变量的对象
    */
   async getTasks(categoryId, forceRefresh = false) {
     try {
@@ -203,7 +203,12 @@ class ApiService {
       const data = await this.get('/api/user-enf/tasks', {
         categoryId
       });
-      return data.tasks || [];
+      
+      // 返回包含任务列表和全局变量的对象
+      return {
+        tasks: data.tasks || [],
+        globalVariables: data.globalVariables || {}
+      };
     } catch (error) {
       throw error;
     }
@@ -255,6 +260,31 @@ class ApiService {
         ...(deviceSnList !== undefined ? { deviceSnList } : {})
       });
       return data.task;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * 更新分类全局变量
+   * @param {string} categoryId - 分类ID
+   * @param {Object} globalVariables - 全局变量对象
+   * @returns {Promise} Promise对象
+   */
+  async updateCategoriesGlobalVariables(categoryId, globalVariables) {
+    try {
+      if (!categoryId) {
+        throw new Error('分类ID不能为空');
+      }
+      if (!globalVariables || typeof globalVariables !== 'object') {
+        throw new Error('全局变量不能为空');
+      }
+
+      const data = await this.put('/api/user-enf/categories-global-variables', {
+        categoryId,
+        globalVariables
+      });
+      return data;
     } catch (error) {
       throw error;
     }

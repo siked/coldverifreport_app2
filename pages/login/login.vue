@@ -96,6 +96,8 @@ import storageManager from '@/common/storage.js'
 export default {
   data() {
     return {
+      // 默认服务器地址（用于首次安装/无历史记录场景）Cursor Write It
+      defaultServerUrl: 'http://1.95.112.212:3001',
       serverUrl: '',
       customServerUrl: '',
       username: '',
@@ -134,6 +136,10 @@ export default {
     loadStoredData() {
       // 加载服务器历史记录
       this.serverHistory = storageManager.getServerHistory();
+      // 确保默认服务器地址出现在下拉选项中 Cursor Write It
+      if (this.defaultServerUrl && !this.serverHistory.includes(this.defaultServerUrl)) {
+        this.serverHistory = [this.defaultServerUrl, ...this.serverHistory];
+      }
       
       // 加载上次使用的服务器地址
       const savedServerUrl = storageManager.getServerUrl();
@@ -152,7 +158,12 @@ export default {
         this.validateServerUrl();
         this.loadCredentialsForServer(firstServer);
       } else {
-        // 如果没有任何服务器历史记录，尝试加载一般用户名密码
+        // 如果没有任何服务器历史记录，设置默认服务器地址 Cursor Write It
+        this.serverUrl = this.defaultServerUrl;
+        this.selectedServer = this.defaultServerUrl;
+        this.validateServerUrl();
+        
+        // 尝试加载一般用户名密码 Cursor Write It
         this.username = storageManager.getUsername() || '';
         this.password = storageManager.getPassword() || '';
       }

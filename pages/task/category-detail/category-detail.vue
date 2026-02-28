@@ -2,8 +2,22 @@
   <view class="task-container">
     <!-- 页面标题 -->
     <view class="page-header">
-      <text class="page-title">{{ categoryName }}</text>
-      <text v-if="templateName" class="template-name">{{ templateName }}</text>
+      <view class="header-top">
+        <view class="header-title-wrap">
+          <text class="page-title">{{ categoryName }}</text>
+          <text v-if="templateName" class="template-name">{{ templateName }}</text>
+        </view>
+        <view class="header-actions">
+          <view 
+            class="global-vars-btn" 
+            :class="{ 'global-vars-btn-unsynced': hasUnsyncedGlobalVariables }"
+            @click="goToGlobalVariables"
+          >
+            <text class="btn-icon">⚙</text>
+            <text class="btn-text">全局变量</text>
+          </view>
+        </view>
+      </view>
     </view>
 
     <!-- 任务列表 -->
@@ -85,6 +99,8 @@ export default {
       scrollTop: 0,
       currentScrollTop: 0,
       refresherTriggered: false,
+      // 全局变量是否有未提交更新（用于顶部按钮提示）
+      hasUnsyncedGlobalVariables: false,
       // 提交相关状态
       isSubmitting: false,
       currentSubmitIndex: 0,
@@ -237,6 +253,8 @@ export default {
           const cachedData = uni.getStorageSync(this.cacheKey);
           if (cachedData && cachedData.tasks && Array.isArray(cachedData.tasks)) {
             console.log('从缓存加载任务数据:', this.cacheKey, '任务数量:', cachedData.tasks.length);
+            // 读取全局变量未提交标志（用于按钮变黄提示）
+            this.hasUnsyncedGlobalVariables = !!cachedData.hasUnsyncedGlobalVariables;
             // 从缓存的任务列表中提取模板名称
             if (cachedData.tasks.length > 0 && cachedData.tasks[0].templateName) {
               this.templateName = cachedData.tasks[0].templateName;
@@ -257,7 +275,10 @@ export default {
         }
         
         // 从API获取数据
-        const tasks = await apiService.getTasks(this.categoryId);
+        const result = await apiService.getTasks(this.categoryId);
+        const tasks = result.tasks || [];
+        const globalVariables = result.globalVariables || {};
+        
         // 为每条任务增加"未提交标签"标记字段，默认认为从服务器拉取的是已提交状态
         const tasksWithFlag = (tasks || []).map(task => ({
           ...task,
@@ -274,16 +295,22 @@ export default {
         
         // 读取现有缓存以保留滚动位置等数据
         const existingCache = uni.getStorageSync(this.cacheKey) || {};
+        // 保留全局变量未提交标志（避免被覆盖）
+        const hasUnsyncedGlobalVariables = !!existingCache.hasUnsyncedGlobalVariables;
         
-        // 将数据保存到缓存，保留原有的 data 信息
+        // 将数据保存到缓存，包含任务列表和全局变量，保留原有的 data 信息
         uni.setStorageSync(this.cacheKey, {
           tasks: sortedTasks,
+          globalVariables: globalVariables,
+          hasUnsyncedGlobalVariables,
           timestamp: Date.now(),
           data: existingCache.data || {} // 保留原有的 data 信息（包括滚动位置）
         });
         
-        console.log('数据已保存到缓存:', this.cacheKey, '任务数量:', sortedTasks.length);
+        console.log('数据已保存到缓存:', this.cacheKey, '任务数量:', sortedTasks.length, '全局变量:', globalVariables);
         
+        // 同步按钮提示状态
+        this.hasUnsyncedGlobalVariables = hasUnsyncedGlobalVariables;
         this.tasks = sortedTasks;
       } catch (error) {
         console.error('加载任务失败:', error);
@@ -358,6 +385,8 @@ export default {
         
         const cachedData = uni.getStorageSync(this.cacheKey);
         if (cachedData && cachedData.tasks && Array.isArray(cachedData.tasks)) {
+          // 同步全局变量未提交标志（用于按钮变黄提示）
+          this.hasUnsyncedGlobalVariables = !!cachedData.hasUnsyncedGlobalVariables;
           // 创建新数组引用并排序，确保 Vue 能够检测到变化
           const newTasks = this.sortTasks(cachedData.tasks.map(task => ({ ...task })));
           
@@ -383,6 +412,13 @@ export default {
       
       uni.navigateTo({
         url: `/pages/task/task-detail/task-detail?taskId=${task._id}&taskName=${encodeURIComponent(task.taskName)}&taskNo=${encodeURIComponent(task.taskNo)}&tags=${tagsParam}&categoryId=${this.categoryId}`
+      });
+    },
+
+    // 跳转到全局变量配置页面
+    goToGlobalVariables() {
+      uni.navigateTo({
+        url: `/pages/task/global-variables/global-variables?categoryId=${this.categoryId}&categoryName=${encodeURIComponent(this.categoryName)}`
       });
     },
 
@@ -687,6 +723,18 @@ export default {
   border-bottom: 1rpx solid #eee;
 }
 
+.header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.header-title-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
 .page-title {
   font-size: 36rpx;
   font-weight: bold;
@@ -700,6 +748,34 @@ export default {
   font-size: 26rpx;
   color: #999;
   margin-top: 8rpx;
+}
+
+.header-actions {
+  flex-shrink: 0;
+}
+
+.global-vars-btn {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 12rpx 24rpx;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12rpx;
+  color: white;
+  font-size: 26rpx;
+}
+
+.global-vars-btn-unsynced {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  color: #1f2937;
+}
+
+.global-vars-btn .btn-icon {
+  font-size: 28rpx;
+}
+
+.global-vars-btn .btn-text {
+  font-size: 26rpx;
 }
 
 .task-list {
