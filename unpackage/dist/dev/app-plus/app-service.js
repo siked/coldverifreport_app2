@@ -846,7 +846,7 @@ if (uni.restoreGlobal) {
   function _sfc_render$5(_ctx, _cache, $props, $setup, $data, $options) {
     return vue.openBlock(), vue.createElementBlock("view", { class: "login-container" }, [
       vue.createElementVNode("view", { class: "header" }, [
-        vue.createElementVNode("text", { class: "title" }, "冷链验证系统"),
+        vue.createElementVNode("text", { class: "title" }, "冷链验证APP"),
         vue.createElementVNode("text", { class: "subtitle" }, "Cold Chain Verification System")
       ]),
       vue.createElementVNode("view", { class: "login-form" }, [
@@ -1800,7 +1800,7 @@ ${errorMsg}`,
       // 关于应用
       aboutApp() {
         uni.showModal({
-          title: "关于冷链验证系统",
+          title: "关于冷链验证APP",
           content: "版本: 1.0.0\n这是一个专业的冷链验证实施过程记录应用，帮助用户高效管理冷链验证任务。",
           showCancel: false
         });
@@ -1902,7 +1902,7 @@ ${errorMsg}`,
         }, "退出登录")
       ]),
       vue.createElementVNode("view", { class: "version-info" }, [
-        vue.createElementVNode("text", { class: "version-text" }, "冷链验证系统 v1.0.0")
+        vue.createElementVNode("text", { class: "version-text" }, "冷链验证APP v1.0.0")
       ])
     ]);
   }
@@ -10828,7 +10828,7 @@ ${errorMsg}`,
   ];
   const globalStyle = {
     pageOrientation: "portrait",
-    navigationBarTitleText: "冷链验证系统",
+    navigationBarTitleText: "冷链验证APP",
     navigationBarTextStyle: "white",
     navigationBarBackgroundColor: "#667eea",
     backgroundColor: "#F8F8F8",

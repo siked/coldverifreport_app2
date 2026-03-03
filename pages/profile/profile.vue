@@ -74,7 +74,7 @@
 
     <!-- 版本信息 -->
     <view class="version-info">
-      <text class="version-text">冷链验证系统 v1.0.0</text>
+      <text class="version-text">{{ appNameVersionText }}</text>
     </view>
   </view>
 </template>
@@ -83,6 +83,7 @@
 import storageManager from '@/common/storage.js'
 import apiService from '@/common/api.js'
 import { checkAppVersion, getAppVersion } from '@/common/version-check.js'
+import { getManifestVersionName } from '@/common/app-info.js'
 
 export default {
   data() {
@@ -90,13 +91,17 @@ export default {
       userInfo: {},
       serverUrl: '',
       hasUnsyncedData: false,
-      currentVersion: 'v1.0.0',
+      currentVersion: getAppVersion(),
       hasNewVersion: false,
       latestVersionInfo: null
     }
   },
 
   computed: {
+    // 底部展示用：应用名 + 版本号（从 manifest.json 获取）
+    appNameVersionText() {
+      return `冷链验证APP ${getManifestVersionName()}`;
+    },
     // 用户姓名首字母
     userInitials() {
       if (this.userInfo.username) {
@@ -216,7 +221,7 @@ export default {
     // 关于应用
     aboutApp() {
       uni.showModal({
-        title: '关于冷链验证系统',
+        title: '关于冷链验证APP',
         content: `版本: ${this.currentVersion}\n这是一个专业的冷链验证实施过程记录应用，帮助用户高效管理冷链验证任务。`,
         showCancel: false
       });

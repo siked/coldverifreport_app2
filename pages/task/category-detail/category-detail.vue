@@ -277,7 +277,15 @@ export default {
         // 从API获取数据
         const result = await apiService.getTasks(this.categoryId);
         const tasks = result.tasks || [];
-        const globalVariables = result.globalVariables || {};
+        
+        // 读取现有缓存：用于保留全局变量/滚动位置/提示标志等，避免被刷新覆盖
+        const existingCache = uni.getStorageSync(this.cacheKey) || {};
+        
+        // 接口若未返回 globalVariables（或返回 null/undefined），沿用缓存里的，避免被写成空对象
+        const globalVariables =
+          (result && result.globalVariables !== undefined && result.globalVariables !== null)
+            ? result.globalVariables
+            : (existingCache.globalVariables || {});
         
         // 为每条任务增加"未提交标签"标记字段，默认认为从服务器拉取的是已提交状态
         const tasksWithFlag = (tasks || []).map(task => ({
@@ -293,13 +301,12 @@ export default {
         // 对任务列表进行排序
         const sortedTasks = this.sortTasks(tasksWithFlag);
         
-        // 读取现有缓存以保留滚动位置等数据
-        const existingCache = uni.getStorageSync(this.cacheKey) || {};
         // 保留全局变量未提交标志（避免被覆盖）
         const hasUnsyncedGlobalVariables = !!existingCache.hasUnsyncedGlobalVariables;
         
         // 将数据保存到缓存，包含任务列表和全局变量，保留原有的 data 信息
         uni.setStorageSync(this.cacheKey, {
+          ...existingCache,
           tasks: sortedTasks,
           globalVariables: globalVariables,
           hasUnsyncedGlobalVariables,

@@ -2,7 +2,7 @@
   <view class="login-container">
     <!-- 页面标题 -->
     <view class="header">
-      <text class="title">冷链验证系统</text>
+      <text class="title">冷链验证APP</text>
       <text class="subtitle">Cold Chain Verification System</text>
     </view>
 
@@ -12,8 +12,9 @@
       <view class="form-item">
         <text class="label">服务器地址</text>
         <picker 
-          v-if="serverHistory.length > 0" 
-          :range="serverHistoryWithCustom" 
+          v-if="serverList.length > 0" 
+          :range="serverNameListWithCustom" 
+          :value="serverPickerIndex"
           @change="onServerChange"
           class="server-picker"
         >
@@ -37,6 +38,7 @@
           v-model="customServerUrl" 
           placeholder="请输入服务器地址" 
           class="input"
+          @input="validateServerUrl"
           @blur="validateServerUrl"
         />
         <button 
@@ -84,7 +86,7 @@
 
     <!-- 底部信息 -->
     <view class="footer">
-      <text class="version">版本号: 1.0.0</text>
+      <text class="version">{{ appNameVersionText }}</text>
     </view>
   </view>
 </template>
@@ -92,19 +94,31 @@
 <script>
 import apiService from '@/common/api.js'
 import storageManager from '@/common/storage.js'
+import { getManifestVersionName } from '@/common/app-info.js'
+
+// 兜底服务器列表：仅用于远程 JSON 拉取失败时，避免页面无可选项
+const fallbackServerList = [
+  { Name: '贵州节点', ServerUrl: 'http://1.95.112.212:3001' }
+]
 
 export default {
   data() {
     return {
-      // 默认服务器地址（用于首次安装/无历史记录场景）Cursor Write It
+      // 默认服务器地址（当 JSON 读取失败或为空时兜底）
       defaultServerUrl: 'http://1.95.112.212:3001',
+      // 远程 JSON 配置文件地址（你上传到服务器后，把这个 URL 改成真实地址即可）
+      // 期望返回数组：[{ Name: '杭州节点', ServerUrl: 'http://x.x.x.x:3001' }, ...]
+      serverConfigJsonUrl: 'https://oss.yunlot.com/AppServersUrl.json',
+      // 从 JSON 读取的服务器列表：[{ Name, ServerUrl }]
+      serverList: [],
+      // picker 当前选中索引（默认 0：JSON 列表第一个）
+      serverPickerIndex: 0,
       serverUrl: '',
       customServerUrl: '',
       username: '',
       password: '',
       loggingIn: false,
 
-      serverHistory: [],
       selectedServer: '',
       showCustomServer: false,
       isValidServerUrl: false
@@ -112,6 +126,10 @@ export default {
   },
 
   computed: {
+    // 底部展示：冷链验证APP vX.X.X（带 v）
+    appNameVersionText() {
+      return `冷链验证APP ${getManifestVersionName()}`
+    },
     // 计算属性：是否可以登录
     canLogin() {
       return this.serverUrl && 
@@ -121,49 +139,88 @@ export default {
              this.isValidServerUrl;
     },
     
-    // 带自定义选项的服务器历史记录
-    serverHistoryWithCustom() {
-      return [...this.serverHistory, '自定义服务器地址'];
+    // picker 下拉展示：仅展示 Name（最后追加“自定义服务器地址”）
+    serverNameListWithCustom() {
+      return [...this.serverList.map(item => item.Name), '自定义服务器地址'];
     }
   },
 
   onLoad() {
-    this.loadStoredData();
+    this.initPage();
   },
 
   methods: {
+    async initPage() {
+      await this.loadServerListFromJson();
+      this.loadStoredData();
+    },
+
+    async loadServerListFromJson() {
+      let list = null;
+
+      // 通过远程 URL 获取 JSON
+      try {
+        list = await new Promise((resolve, reject) => {
+          uni.request({
+            url: this.serverConfigJsonUrl,
+            method: 'GET',
+            success: (res) => {
+              const data = res && res.data;
+              if (Array.isArray(data)) return resolve(data);
+              return reject(new Error('服务器配置 JSON 格式不正确：需要数组'));
+            },
+            fail: (err) => reject(err)
+          });
+        });
+      } catch (e) {
+        // fallback：远程不可用时兜底
+        list = fallbackServerList;
+      }
+
+      const normalized = (Array.isArray(list) ? list : [])
+        .map(item => {
+          if (!item) return null;
+          const Name = item.Name || item.name;
+          const ServerUrl = item.ServerUrl || item.serverUrl;
+          if (!Name || !ServerUrl) return null;
+          return { Name, ServerUrl };
+        })
+        .filter(Boolean);
+
+      this.serverList = normalized;
+    },
+
     // 加载已存储的数据
     loadStoredData() {
-      // 加载服务器历史记录
-      this.serverHistory = storageManager.getServerHistory();
-      // 确保默认服务器地址出现在下拉选项中 Cursor Write It
-      if (this.defaultServerUrl && !this.serverHistory.includes(this.defaultServerUrl)) {
-        this.serverHistory = [this.defaultServerUrl, ...this.serverHistory];
-      }
-      
       // 加载上次使用的服务器地址
       const savedServerUrl = storageManager.getServerUrl();
       if (savedServerUrl) {
         this.serverUrl = savedServerUrl;
-        this.selectedServer = savedServerUrl;
+        // 如果保存的地址存在于 JSON 列表中，则展示对应 Name；否则直接展示 URL（兼容历史自定义地址）
+        const matchedIndex = this.serverList.findIndex(item => item.ServerUrl === savedServerUrl);
+        const matched = matchedIndex >= 0 ? this.serverList[matchedIndex] : null;
+        this.selectedServer = matched ? matched.Name : savedServerUrl;
+        // 若不在列表中，则让 picker 高亮“自定义服务器地址”
+        this.serverPickerIndex = matchedIndex >= 0 ? matchedIndex : this.serverList.length;
         this.validateServerUrl();
         
         // 根据服务器地址加载对应的账号密码
         this.loadCredentialsForServer(savedServerUrl);
-      } else if (this.serverHistory.length > 0) {
-        // 如果没有保存的服务器地址但有历史记录，加载第一个服务器的账号密码
-        const firstServer = this.serverHistory[0];
-        this.serverUrl = firstServer;
-        this.selectedServer = firstServer;
+      } else if (this.serverList.length > 0) {
+        // 默认选择 JSON 列表第一个
+        const firstServer = this.serverList[0];
+        this.serverUrl = firstServer.ServerUrl;
+        this.selectedServer = firstServer.Name;
+        this.serverPickerIndex = 0;
         this.validateServerUrl();
-        this.loadCredentialsForServer(firstServer);
+        this.loadCredentialsForServer(this.serverUrl);
       } else {
-        // 如果没有任何服务器历史记录，设置默认服务器地址 Cursor Write It
+        // 如果 JSON 为空/读取失败，设置兜底默认服务器地址
         this.serverUrl = this.defaultServerUrl;
         this.selectedServer = this.defaultServerUrl;
         this.validateServerUrl();
         
-        // 尝试加载一般用户名密码 Cursor Write It
+        // 尝试加载一般用户名密码
         this.username = storageManager.getUsername() || '';
         this.password = storageManager.getPassword() || '';
       }
@@ -177,18 +234,22 @@ export default {
 
     // 服务器选择变化
     onServerChange(e) {
-      const selectedIndex = e.detail.value;
+      const selectedIndex = Number(e.detail.value);
       
-      if (selectedIndex === this.serverHistory.length) {
+      if (selectedIndex === this.serverList.length) {
         // 选择了自定义
         this.showCustomServer = true;
         this.customServerUrl = '';
-        this.selectedServer = '';
+        this.selectedServer = '自定义服务器地址';
+        this.serverPickerIndex = selectedIndex;
+        this.validateServerUrl();
       } else {
-        // 选择了历史记录中的服务器
+        // 选择了 JSON 列表中的服务器
         this.showCustomServer = false;
-        this.serverUrl = this.serverHistory[selectedIndex];
-        this.selectedServer = this.serverUrl;
+        const selected = this.serverList[selectedIndex];
+        this.serverUrl = selected.ServerUrl;
+        this.selectedServer = selected.Name;
+        this.serverPickerIndex = selectedIndex;
         this.validateServerUrl();
               
         // 自动加载该服务器保存的账号密码
@@ -215,10 +276,10 @@ export default {
         this.serverUrl = this.customServerUrl;
         this.selectedServer = this.customServerUrl;
         this.showCustomServer = false;
+        this.serverPickerIndex = this.serverList.length;
         
         // 保存到历史记录（包括账号密码）
         storageManager.setServerUrl(this.serverUrl, this.username, this.password);
-        this.serverHistory = storageManager.getServerHistory();
         
         // 加载该服务器的账号密码
         this.loadCredentialsForServer(this.serverUrl);
@@ -322,11 +383,12 @@ export default {
 
 <style scoped>
 .login-container {
-  min-height: 100vh;
+  height: 100vh;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 40rpx;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
 }
 
 .header {
@@ -355,6 +417,8 @@ export default {
   padding: 40rpx;
   box-shadow: 0 20rpx 40rpx rgba(0, 0, 0, 0.1);
   flex: 1;
+  min-height: 0; /* 允许在 flex 容器内正确收缩，从而让 footer 不被挤出屏幕 */
+  overflow-y: auto; /* 表单内容过高时仅滚动表单区域 */
 }
 
 .form-item {
@@ -417,11 +481,14 @@ export default {
 
 .footer {
   text-align: center;
-  margin-top: 40rpx;
+  margin-top: 20rpx;
+  flex-shrink: 0;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
 }
 
 .version {
   color: rgba(255, 255, 255, 0.7);
   font-size: 24rpx;
+  white-space: nowrap;
 }
 </style>

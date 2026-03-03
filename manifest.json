@@ -2,8 +2,8 @@
     "name" : "冷链验证APP",
     "appid" : "__UNI__C3F805A",
     "description" : "这是一款 专为实施人员设计 现场 实施过程采集 的应用APP",
-    "versionName" : "1.1.0",
-    "versionCode" : 110,
+    "versionName" : "1.1.2",
+    "versionCode" : 112,
     "transformPx" : false,
     "app-plus" : {
         "usingComponents" : true,

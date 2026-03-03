@@ -5,6 +5,18 @@
 
 import apiService from '@/common/api.js'
 import storageManager from '@/common/storage.js'
+import { getManifestVersionName } from '@/common/app-info.js'
+
+/**
+ * 统一版本号格式：保证带 v 前缀
+ * @param {string} version
+ * @returns {string}
+ */
+function normalizeVersion(version) {
+	const v = (version || '').toString().trim()
+	if (!v) return getManifestVersionName()
+	return /^v/i.test(v) ? v : `v${v}`
+}
 
 /**
  * 比较版本号
@@ -43,19 +55,19 @@ function getCurrentVersion() {
 		const systemInfo = uni.getSystemInfoSync();
 		// 尝试获取 appWgtVersion（应用版本号）
 		if (systemInfo.appWgtVersion) {
-			return systemInfo.appWgtVersion;
+			return normalizeVersion(systemInfo.appWgtVersion);
 		}
 		// 如果没有，尝试从 plus.runtime 获取
 		if (plus && plus.runtime && plus.runtime.version) {
-			return plus.runtime.version;
+			return normalizeVersion(plus.runtime.version);
 		}
 	} catch (e) {
 		console.error('获取应用版本号失败:', e);
 	}
 	// #endif
 	
-	// 默认版本号（可以从 package.json 或 manifest.json 读取）
-	return 'v1.0.0';
+	// 兜底：统一从 manifest.json 读取
+	return getManifestVersionName();
 }
 
 /**

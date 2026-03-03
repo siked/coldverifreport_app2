@@ -1861,7 +1861,9 @@ export default {
             }
             
             if (changed || dataTasksChanged) {
+              // 合并写回：避免覆盖掉同一缓存下的其他字段（如 globalVariables / hasUnsyncedGlobalVariables 等）
               uni.setStorageSync(key, {
+                ...cachedData,
                 tasks: hasTasksArray ? updatedTasks : cachedData.tasks,
                 timestamp: cachedData.timestamp || Date.now(),
                 data: updatedData
@@ -1977,7 +1979,9 @@ export default {
             }
             
             if (changed || dataTasksChanged) {
+              // 合并写回：避免覆盖掉同一缓存下的其他字段（如 globalVariables / hasUnsyncedGlobalVariables 等）
               uni.setStorageSync(key, {
+                ...cachedData,
                 tasks: hasTasksArray ? updatedTasks : cachedData.tasks,
                 timestamp: cachedData.timestamp || Date.now(),
                 data: updatedData
@@ -2049,7 +2053,9 @@ export default {
                   };
                   
                   // 保存更新后的数据到缓存，保留原有的 data 对象
+                  // 合并写回：避免覆盖掉同一缓存下的其他字段（如 globalVariables / hasUnsyncedGlobalVariables 等）
                   uni.setStorageSync(key, {
+                    ...cachedData,
                     tasks: updatedTasks,
                     timestamp: cachedData.timestamp || Date.now(),
                     data: cachedData.data || {} // 保留任务列表的滚动位置等数据
